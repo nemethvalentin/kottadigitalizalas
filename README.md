@@ -1,0 +1,2 @@
+# kottadigitalizalas
+Kottadigitalizáló szoftver programkódja.
