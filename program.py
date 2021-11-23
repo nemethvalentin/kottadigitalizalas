@@ -1,9 +1,10 @@
 #Könyvtárak beimportálása
 import cv2
 import numpy as np
+from tensorflow import keras
 
 #Kép beolvasása és transzformálása
-img = cv2.imread('kepek/tesztkepek/test2.jpg')
+img = cv2.imread('kepek/tesztkepek/test1.jpg')
 gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 thresh= cv2.threshold(gray,100,255,cv2.THRESH_BINARY)[1]
 thresh = 255-thresh
@@ -80,7 +81,7 @@ for cnt in contours:
 
     cv2.rectangle(verticalRGB, (x,y), (x+w, y+h), (255,0,255), thickness=2)
 
-    symbols.append(vertical[y:y+h, x:x+w])
+    symbols.append(verticalRGB[y:y+h, x:x+w])
 
 symbols = sorted(symbols, key=lambda symbol: symbol.shape[1], reverse=True)
 
@@ -89,43 +90,14 @@ symbols = sorted(symbols, key=lambda symbol: symbol.shape[1], reverse=True)
 #    cv2.imwrite("template"+str(c)+".png", symbols[c])
 #    c = c + 1
 
-#Template matching a hangjegyek megtalálására
-notes = []
-#thresholds = [0.7, 0.834, 0.7935, 0.75, 0.83, 0.8, 0.75, 0.85, 0.75, 0.75, 0.75, 0.75, 0.75, 0.8, 0.8, 0.8, 0.8, 0.75, 0.75, 0.7, 0.72, 0.75, 0.815, 0.7715, 0.7, 0.741, 0.75, 0.675, 0.85, 0.68]
-#templates = [cv2.imread('kepek/template'+str(c)+'.jpg',cv2.IMREAD_GRAYSCALE) for c in range(1,30)]
-c = 1
-while c <= 3:
-    template = cv2.imread('kepek/ujtemplatek/template'+str(c)+'.png')
-    temp_gray = cv2.cvtColor(template,cv2.COLOR_BGR2GRAY)
-    temp_thresh = cv2.threshold(temp_gray,100,255,cv2.THRESH_BINARY)[1]
-    temp_thresh = 255 - temp_thresh
-    w = template.shape[1]
-    h = template.shape[0]
-    result = cv2.matchTemplate(thresh, temp_thresh, cv2.TM_CCOEFF_NORMED)
-    threshold = 0.57
-    loc = np.where( result >= threshold)
-    for pt in zip(*loc[::-1]): 
-        appendable = True
-        for i in notes:
-            if abs(i[0][0]-pt[0])<10 and abs(i[0][1]-pt[1])<10:
-                appendable = False
-                break
-        if appendable:
-            notes.append([pt, c])
-            cv2.rectangle(thresh, pt, (pt[0] + w, pt[1] + h), (0,0,0), -1)
-            cv2.rectangle(img, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
-
-    c=c+1
-
-#template = cv2.imread("kepek/templatek/template1.jpg")
-#temp_gray = cv2.cvtColor(template,cv2.COLOR_BGR2GRAY)
-#w = template.shape[1]
-#h = template.shape[0]
-#result = cv2.matchTemplate(gray, temp_gray, cv2.TM_CCOEFF_NORMED)
-#threshold = thresholds[c-1]
-#loc = np.where( result >= threshold)
-#for pt in zip(*loc[::-1]):
-#    cv2.rectangle(img, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
+classified_symbols=[]
+model = keras.models.load_model('symbol_classification.h5')
+for x in symbols:
+    x=cv2.resize(x, (32, 32), interpolation=cv2.INTER_CUBIC)
+    x=x.reshape(-1, 32, 32, 3)
+    prediction = model.predict(x)
+    print(np.argmax(prediction[0]))
+    classified_symbols.append(np.argmax(prediction[0]))
 
 cv2.imwrite("tempmatch.jpg", img)
 cv2.imwrite("tempremoved.jpg", gray)
