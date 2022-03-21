@@ -44,31 +44,21 @@ while i<len(goodLines):
        tempLines = []
        
 #Kottavonalak kitörlése
-vertical = np.copy(thresh)
-rows = vertical.shape[0]
-verticalSize = 5
-verticalStructure = cv2.getStructuringElement(cv2.MORPH_RECT, (1, verticalSize))
-vertical = cv2.erode(vertical, verticalStructure)
-vertical = cv2.dilate(vertical, verticalStructure)
+horizontal = np.copy(thresh)
+rows = horizontal.shape[0]
+horizontalSize = 5
+horizontalStructure = cv2.getStructuringElement(cv2.MORPH_RECT, (1, horizontalSize))
+horizontal = cv2.erode(horizontal, horizontalStructure)
+horizontal = cv2.dilate(horizontal, horizontalStructure)
 
-vertical = cv2.bitwise_not(vertical)
-edges = cv2.adaptiveThreshold(vertical, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, -2)
-kernel = np.ones((2, 2), np.uint8)
-edges = cv2.dilate(edges, kernel)
-
-smooth = np.copy(vertical)
-
-smooth = cv2.blur(smooth, (2, 2))
-
-(rows, cols) = np.where(edges != 0)
-vertical[rows, cols] = smooth[rows, cols]
+horizontal = cv2.bitwise_not(horizontal)
 
 #Alakzatok kontúrjainak megkeresése és megjelölése
-vertical_reverse = 255-vertical
-contours, hierarchy = cv2.findContours(vertical_reverse, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+horizontal_reverse = 255-horizontal
+contours, hierarchy = cv2.findContours(horizontal_reverse, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-verticalRGB = cv2.cvtColor(vertical,cv2.COLOR_GRAY2BGR)
-cv2.drawContours(verticalRGB, contours, -1, (0,0,255), thickness=2)
+horizontalRGB = cv2.cvtColor(horizontal,cv2.COLOR_GRAY2BGR)
+cv2.drawContours(horizontalRGB, contours, -1, (0,0,255), thickness=2)
 
 #Alakzatok eltárolása
 symbols = []
@@ -79,31 +69,23 @@ for cnt in contours:
 
     x, y, w, h = cv2.boundingRect(approx)
 
-    cv2.rectangle(verticalRGB, (x,y), (x+w, y+h), (255,0,255), thickness=2)
+    cv2.rectangle(horizontalRGB, (x,y), (x+w, y+h), (255,0,255), thickness=2)
 
-    symbols.append(verticalRGB[y:y+h, x:x+w])
+    symbols.append(horizontal[y:y+h, x:x+w])
 
 symbols = sorted(symbols, key=lambda symbol: symbol.shape[1], reverse=True)
 
-#c = 1
-#while c <= 575:
-#    cv2.imwrite("template"+str(c)+".png", symbols[c])
-#    c = c + 1
-
+#Neurális modell alkalmazása
 classified_symbols=[]
 model = keras.models.load_model('symbol_classification.h5')
 for x in symbols:
     x=cv2.resize(x, (32, 32), interpolation=cv2.INTER_CUBIC)
-    x=x.reshape(-1, 32, 32, 3)
+    x=x.reshape(-1, 32, 32, 1)
     prediction = model.predict(x)
-    print(np.argmax(prediction[0]))
     classified_symbols.append(np.argmax(prediction[0]))
 
-cv2.imwrite("tempmatch.jpg", img)
-cv2.imwrite("tempremoved.jpg", gray)
+cv2.imwrite("lines.jpg", lines)
+cv2.imwrite("contours.jpg", horizontalRGB)
+cv2.imwrite("linesremoved.jpg", horizontal)
 
-#cv2.imshow("symbol", symbols[141])
-
-cv2.imwrite("contours.jpg", verticalRGB)
-cv2.imwrite("linesremoved.jpg", vertical)
 cv2.waitKey(0)
