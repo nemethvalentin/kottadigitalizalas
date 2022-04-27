@@ -1,0 +1,1 @@
+altoClef, beams, flat, naturals, notes, notesFlags, notesOpen, relation, rests1, rests2, sharps, time, trebleClef
