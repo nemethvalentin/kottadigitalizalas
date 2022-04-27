@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 from tensorflow import keras
 
+from createOutput import create_midi
+
 #Kép beolvasása és transzformálása
 img = cv2.imread('kepek/tesztkepek/test1.jpg')
 gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -42,7 +44,9 @@ while i<len(goodLines):
    if len(tempLines) == 5:
        permaLines.append(tempLines)
        tempLines = []
-       
+
+
+
 #Kottavonalak kitörlése
 horizontal = np.copy(thresh)
 rows = horizontal.shape[0]
@@ -71,18 +75,88 @@ for cnt in contours:
 
     cv2.rectangle(horizontalRGB, (x,y), (x+w, y+h), (255,0,255), thickness=2)
 
-    symbols.append(horizontal[y:y+h, x:x+w])
+    symbols.append([horizontal[y:y+h, x:x+w], [x, y, w, h]])
 
-symbols = sorted(symbols, key=lambda symbol: symbol.shape[1], reverse=True)
+symbols = sorted(symbols, key=lambda symbol: symbol[0].shape[1], reverse=True)
 
 #Neurális modell alkalmazása
 classified_symbols=[]
+note_symbols_pos=[]
 model = keras.models.load_model('symbol_classification.h5')
-for x in symbols:
-    x=cv2.resize(x, (32, 32), interpolation=cv2.INTER_CUBIC)
-    x=x.reshape(-1, 32, 32, 1)
-    prediction = model.predict(x)
+for symbolPic, symbolPos in symbols:
+    symbolPic=cv2.resize(symbolPic, (120, 60), interpolation=cv2.INTER_CUBIC)
+    symbolPic=symbolPic.reshape(-1, 120, 60, 1)
+    prediction= model.predict(symbolPic)
     classified_symbols.append(np.argmax(prediction[0]))
+    predicted = np.argmax(prediction[0])
+    # if predicted == 2 or predicted == 3 or predicted == 4 or predicted == 6 or predicted == 7 or predicted == 8:
+    note_symbols_pos.append(symbolPos)
+
+#Kimenet generálás
+canny = cv2.Canny(gray, 75, 200)
+
+lineDistance = round((permaLines[0][1][1] - permaLines[0][0][1]))
+print(lineDistance)
+
+detected_circles = cv2.HoughCircles(canny,
+                                        cv2.HOUGH_GRADIENT, 1, lineDistance-4, param1=100,
+                                        param2=12, minRadius=round(lineDistance/2 - 4), maxRadius=round(lineDistance/2 + 5))
+circle_centers = []
+
+if detected_circles is not None:
+    detected_circles = np.uint16(np.around(detected_circles))
+
+    for pt in detected_circles[0, :]:
+        a, b, r = pt[0], pt[1], pt[2]
+        for pos in note_symbols_pos:
+            if pos[0] <= a and pos[0]+pos[2] >= a and pos[1] <= b and pos[1]+pos[3] >= b:
+                # cv2.circle(horizontalRGB, (a, b), r, (0, 255, 0), 2)
+                circle_centers.append([a,b])
+                break
+
+permaNotes = []
+for i in range(len(permaLines)):
+    permaNotes.append([])
+
+for circle in circle_centers:
+    i = 0
+    found = False
+    while i < len(permaLines) and not found:
+        j = 0
+        while j < len(permaLines[i]) and not found:
+            line=permaLines[i][j]
+            cldist=abs(line[1]-circle[1])
+            if cldist <= round(lineDistance*3/4):
+                if cldist<round(lineDistance/4):
+                    permaNotes[i].append([ circle[0], (j+1)*2])
+                elif circle[1] < line[1]:
+                    permaNotes[i].append([ circle[0], (j+1)*2-1])
+                else:
+                    permaNotes[i].append([ circle[0], (j+1)*2+1])
+                cv2.circle(horizontalRGB, (circle[0], circle[1]), 10, (0, 255, 0), 2)
+                found = True 
+            j+=1
+        i+=1
+
+
+for row in permaNotes:
+    row.sort(key=lambda note: note[0])
+
+finalNotes = []
+for i in range(len(permaNotes)):
+    finalNotes.append([])
+
+for i in range(len(permaNotes)):
+    if row != []:
+        for note in permaNotes[i]:
+            finalNotes[i].append(note[1])   
+
+output_path='outputs/song'
+
+create_midi(output_path, finalNotes)
+
+    
+
 
 cv2.imwrite("lines.jpg", lines)
 cv2.imwrite("contours.jpg", horizontalRGB)
