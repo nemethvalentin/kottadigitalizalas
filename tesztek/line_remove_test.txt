@@ -1,0 +1,4 @@
+all
+all
+-10
+többi all
