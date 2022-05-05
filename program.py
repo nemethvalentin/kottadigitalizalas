@@ -50,7 +50,7 @@ while i<len(goodLines):
        tempLines = []
 
 cv2.imwrite("lines14.jpg",lineImg)
-print(len(permaLines))
+
 #Kottavonalak kitörlése
 horizontal = np.copy(thresh)
 rows = horizontal.shape[0]
@@ -99,8 +99,8 @@ for symbolPic, symbolPos in symbols:
     prediction= model.predict(symbolPic)
     classified_symbols.append(np.argmax(prediction[0]))
     predicted = np.argmax(prediction[0])
-    # if predicted == 2 or predicted == 3 or predicted == 4 or predicted == 6 or predicted == 7 or predicted == 8:
-    note_symbols_pos.append(symbolPos)
+    if predicted == 2 or predicted == 3 or predicted == 4 or predicted == 6 or predicted == 7 or predicted == 8:
+        note_symbols_pos.append(symbolPos)
 
 
 #Kimenet generálás
@@ -128,8 +128,6 @@ if detected_circles is not None:
                 circle_centers.append([a,b])
                 break
 
-
-# cv2.imwrite("allcircles14.jpg",horizontalRGB)
 
 #Elhelyezkedés alapján a pitch meghatározása
 permaNotes = []
